@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTP/gPTP Protocol Field Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            height: calc(100vh - 40px);
+        }
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .header h1 {
+            color: #1e3c72;
+            font-size: 1.8em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .config-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        
+        .config-notice h4 {
+            color: #856404;
+            margin-bottom: 8px;
+        }
+        
+        .config-notice p {
+            color: #856404;
+            margin-bottom: 5px;
+        }
+        
+        .config-notice code {
+            background: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .message-type {
+            display: inline-block;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .message-type:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .message-type.active {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            transform: scale(1.05);
+        }
+        
+        .tree {
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+        
+        .tree-item {
+            margin: 8px 0;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .tree-item:hover {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            transform: translateX(5px);
+        }
+        
+        .tree-item.clickable {
+            color: #2563eb;
+            font-weight: 600;
+        }
+        
+        .tree-item.clickable:hover {
+            color: #1d4ed8;
+            background: linear-gradient(90deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.1));
+        }
+        
+        .tree-item.header-item {
+            color: #7c3aed;
+            font-weight: 700;
+            font-size: 1.1em;
+            margin-top: 20px;
+            border-left: 4px solid #7c3aed;
+            background: rgba(124, 58, 237, 0.05);
+        }
+        
+        .tree-item.tlv-item {
+            color: #059669;
+            font-weight: 600;
+            border-left: 3px solid #059669;
+            background: rgba(5, 150, 105, 0.05);
+        }
+        
+        .indent-1 { padding-left: 20px; }
+        .indent-2 { padding-left: 40px; }
+        .indent-3 { padding-left: 60px; }
+        
+        .info-panel {
+            position: relative;
+        }
+        
+        .info-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        .info-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .field-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .field-info h3 {
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .field-info .icon {
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .field-description {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .field-description h4 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .field-description p {
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        
+        .field-description .technical {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .welcome-message {
+            text-align: center;
+            color: #6b7280;
+            padding: 40px 20px;
+        }
+        
+        .welcome-message h3 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+        }
+        
+        .message-selector {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .flags-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .flag-item {
+            background: #f1f5f9;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+            font-size: 0.9em;
+        }
+        
+        .field-description + .field-description {
+            margin-top: 15px;
+        }
+        
+        .user-comments {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .user-comments h4 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .github-comment-btn {
+            background: #0366d6;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.875em;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        
+        .github-comment-btn:hover {
+            background: #0056b3;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .comment-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #3b82f6;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .comment-author {
+            font-weight: 600;
+            color: #1e3c72;
+            font-size: 14px;
+        }
+        
+        .comment-time {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .comment-text {
+            color: #374151;
+            line-height: 1.5;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .no-comments {
+            text-align: center;
+            color: #6b7280;
+            font-style: italic;
+            padding: 20px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #6b7280;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <div class="header">
+                <h1>🕒 PTP/gPTP Protocol Explorer</h1>
+                
+                <div class="config-notice">
+                    <h4>⚙️ Setup Required</h4>
+                    <p>To enable comments, update the <code>GITHUB_REPO</code> variable in the script:</p>
+                    <p><code>const GITHUB_REPO = 'yourusername/your-repo-name';</code></p>
+                </div>
+                
+                <div class="message-selector">
+                    <div class="message-type" data-type="announce">Announce</div>
+                    <div class="message-type" data-type="sync">Sync</div>
+                    <div class="message-type" data-type="followup">Follow Up</div>
+                    <div class="message-type" data-type="pdelay_req">P-Delay Req</div>
+                    <div class="message-type" data-type="pdelay_resp">P-Delay Resp</div>
+                    <div class="message-type" data-type="pdelay_fu">P-Delay FU</div>
+                </div>
+            </div>
+            
+            <div class="tree" id="treeView">
+                <!-- Tree content will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <div class="panel info-panel">
+            <div class="info-content active" id="welcomeInfo">
+                <div class="welcome-message">
+                    <h3>Welcome to PTP/gPTP Explorer!</h3>
+                    <p>Select a message type and click on any field to explore the protocol and add team comments via GitHub Issues.</p>
+                    <p>This tool covers IEEE 1588 PTP and IEEE 802.1AS gPTP message formats with collaborative commenting.</p>
+                </div>
+            </div>
+            
+            <div class="info-content" id="fieldInfo">
+                <!-- Field information will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURE THIS: Replace with your GitHub repository
+        const GITHUB_REPO = 'yourusername/your-repo-name';
+
+        const ptpData = {
+            announce: {
+                title: "Announce Message (0xb)",
+                fields: {
+                    "majorSdoId": "Standard Development Organization ID (major part)",
+                    "messageType": "Type of PTP message being sent",
+                    "minorVersionPTP": "Minor version of PTP protocol",
+                    "versionPTP": "Major version of PTP protocol", 
+                    "messageLength": "Total length of the PTP message in bytes",
+                    "domainNumber": "PTP domain identifier for message segregation",
+                    "minorSdoId": "Standard Development Organization ID (minor part)",
+                    "flags": "Control flags for message processing",
+                    "correctionField": "Time correction in nanoseconds",
+                    "messageTypeSpecific": "Message-specific reserved field",
+                    "ClockIdentity": "Unique identifier of the sending clock",
+                    "SourcePortID": "Port number of the sending clock",
+                    "sequenceId": "Sequence number for message ordering",
+                    "controlField": "Legacy field indicating message type",
+                    "logMessagePeriod": "Logarithmic message transmission interval",
+                    "originCurrentUTCOffset": "Offset between TAI and UTC time",
+                    "priority1": "First priority field for best master selection",
+                    "grandmasterClockClass": "Quality class of the grandmaster clock",
+                    "grandmasterClockAccuracy": "Accuracy specification of grandmaster",
+                    "grandmasterClockVariance": "Stability measure of grandmaster frequency",
+                    "priority2": "Second priority field for best master selection", 
+                    "grandmasterClockIdentity": "Identity of the current grandmaster",
+                    "localStepsRemoved": "Hops from grandmaster to local clock",
+                    "TimeSource": "Source of time used by grandmaster",
+                    "Path trace TLV": {
+                        "tlvType": "Type identifier for TLV structure",
+                        "lengthField": "Length of TLV data in bytes",
+                        "PathSequence": "Sequence of clock identities in path"
+                    }
+                }
+            },
+            sync: {
+                title: "Sync Message (0x0)",
+                fields: {
+                    "majorSdoId": "Standard Development Organization ID (major part)",
+                    "messageType": "Type of PTP message being sent",
+                    "minorVersionPTP": "Minor version of PTP protocol",
+                    "versionPTP": "Major version of PTP protocol",
+                    "messageLength": "Total length of the PTP message in bytes",
+                    "domainNumber": "PTP domain identifier for message segregation",
+                    "minorSdoId": "Standard Development Organization ID (minor part)",
+                    "flags": "Control flags for message processing",
+                    "correctionField": "Time correction in nanoseconds",
+                    "messageTypeSpecific": "Message-specific reserved field",
+                    "ClockIdentity": "Unique identifier of the sending clock",
+                    "SourcePortID": "Port number of the sending clock",
+                    "sequenceId": "Sequence number for message ordering",
+                    "controlField": "Legacy field indicating message type",
+                    "logMessagePeriod": "Logarithmic message transmission interval",
+                    "reserved": "Reserved field for future use",
+                    "measuredMessagePeriod": "Actual measured transmission period",
+                    "followUpReference": "Reference to corresponding Follow Up message"
+                }
+            },
+            followup: {
+                title: "Follow Up Message (0x8)",
+                fields: {
+                    "majorSdoId": "Standard Development Organization ID (major part)",
+                    "messageType": "Type of PTP message being sent",
+                    "minorVersionPTP": "Minor version of PTP protocol",
+                    "versionPTP": "Major version of PTP protocol",
+                    "messageLength": "Total length of the PTP message in bytes",
+                    "domainNumber": "PTP domain identifier for message segregation",
+                    "minorSdoId": "Standard Development Organization ID (minor part)",
+                    "flags": "Control flags for message processing",
+                    "correctionField": "Time correction in nanoseconds",
+                    "messageTypeSpecific": "Message-specific reserved field",
+                    "ClockIdentity": "Unique identifier of the sending clock",
+                    "SourcePortID": "Port number of the sending clock",
+                    "sequenceId": "Sequence number for message ordering",
+                    "controlField": "Legacy field indicating message type",
+                    "logMessagePeriod": "Logarithmic message transmission interval",
+                    "preciseOriginTimestamp": "Precise timestamp when Sync was sent",
+                    "Follow Up information TLV": {
+                        "tlvType": "Type identifier for TLV structure",
+                        "lengthField": "Length of TLV data in bytes",
+                        "organizationId": "IEEE organization identifier",
+                        "OrganizationSubType": "Sub-type within organization",
+                        "cumulativeScaledRateOffset": "Cumulative frequency offset",
+                        "cumulativeRateRatio": "Cumulative rate ratio calculation",
+                        "gmTimeBaseIndicator": "Grandmaster time base change indicator",
+                        "lastGMPhaseChange": "Last grandmaster phase change",
+                        "scaledLastGmFreqChange": "Last grandmaster frequency change"
+                    },
+                    "calculatedSyncTimestamp": "Calculated precise sync timestamp",
+                    "calculatedSyncRateRatio": "Calculated frequency rate ratio",
+                    "syncReference": "Reference to corresponding Sync message"
+                }
+            },
+            pdelay_req: {
+                title: "Peer Delay Request Message (0x2)",
+                fields: {
+                    "majorSdoId": "Standard Development Organization ID (major part)",
+                    "messageType": "Type of PTP message being sent",
+                    "minorVersionPTP": "Minor version of PTP protocol",
+                    "versionPTP": "Major version of PTP protocol",
+                    "messageLength": "Total length of the PTP message in bytes",
+                    "domainNumber": "PTP domain identifier for message segregation",
+                    "minorSdoId": "Standard Development Organization ID (minor part)",
+                    "flags": "Control flags for message processing",
+                    "correctionField": "Time correction in nanoseconds",
+                    "messageTypeSpecific": "Message-specific reserved field",
+                    "ClockIdentity": "Unique identifier of the sending clock",
+                    "SourcePortID": "Port number of the sending clock",
+                    "sequenceId": "Sequence number for message ordering",
+                    "controlField": "Legacy field indicating message type",
+                    "logMessagePeriod": "Logarithmic message transmission interval",
+                    "originTimestamp": "Timestamp when request was sent",
+                    "measuredMessagePeriod": "Actual measured transmission period",
+                    "pdelayRespReference": "Reference to corresponding response message"
+                }
+            },
+            pdelay_resp: {
+                title: "Peer Delay Response Message (0x3)",
+                fields: {
+                    "majorSdoId": "Standard Development Organization ID (major part)",
+                    "messageType": "Type of PTP message being sent",
+                    "minorVersionPTP": "Minor version of PTP protocol",
+                    "versionPTP": "Major version of PTP protocol",
+                    "messageLength": "Total length of the PTP message in bytes",
+                    "domainNumber": "PTP domain identifier for message segregation",
+                    "minorSdoId": "Standard Development Organization ID (minor part)",
+                    "flags": "Control flags for message processing",
+                    "correctionField": "Time correction in nanoseconds",
+                    "messageTypeSpecific": "Message-specific reserved field",
+                    "ClockIdentity": "Unique identifier of the sending clock",
+                    "SourcePortID": "Port number of the sending clock",
+                    "sequenceId": "Sequence number for message ordering",
+                    "controlField": "Legacy field indicating message type",
+                    "logMessagePeriod": "Logarithmic message transmission interval",
+                    "requestreceiptTimestamp": "Timestamp when request was received",
+                    "requestingSourcePortIdentity": "Identity of requesting port",
+                    "requestingSourcePortId": "Port ID of requesting device",
+                    "pdelayReqReference": "Reference to corresponding request message",
+                    "pdelayFuReference": "Reference to corresponding follow up message"
+                }
+            },
+            pdelay_fu: {
+                title: "Peer Delay Response Follow Up Message (0xa)",
+                fields: {
+                    "majorSdoId": "Standard Development Organization ID (major part)",
+                    "messageType": "Type of PTP message being sent",
+                    "minorVersionPTP": "Minor version of PTP protocol",
+                    "versionPTP": "Major version of PTP protocol",
+                    "messageLength": "Total length of the PTP message in bytes",
+                    "domainNumber": "PTP domain identifier for message segregation",
+                    "minorSdoId": "Standard Development Organization ID (minor part)",
+                    "flags": "Control flags for message processing",
+                    "correctionField": "Time correction in nanoseconds",
+                    "messageTypeSpecific": "Message-specific reserved field",
+                    "ClockIdentity": "Unique identifier of the sending clock",
+                    "SourcePortID": "Port number of the sending clock",
+                    "sequenceId": "Sequence number for message ordering",
+                    "controlField": "Legacy field indicating message type",
+                    "logMessagePeriod": "Logarithmic message transmission interval",
+                    "responseOriginTimestamp": "Precise timestamp when response was sent",
+                    "requestingSourcePortIdentity": "Identity of requesting port",
+                    "requestingSourcePortId": "Port ID of requesting device",
+                    "calculatedUnscaledMeanPropagationDelay": "Mean propagation delay calculation",
+                    "calculatedScaledMeanPropagationDelay": "Scaled mean propagation delay",
+                    "calculatedNeighborRateRatio": "Neighbor clock frequency ratio",
+                    "pdelayRespReference": "Reference to corresponding response message"
+                }
+            }
+        };
+
+        const fieldDescriptions = {
+            "majorSdoId": {
+                description: "The major part of the Standards Development Organization identifier. For gPTP (IEEE 802.1AS), this is typically 0x1 indicating gPTP Domain. For other PTP profiles, this may be 0x2 for CMLDS (Common Mean Link Delay Service).",
+                technical: "4-bit field in the first octet of PTP header",
+                comments: {
+                    announce: "0x1 (gPTP Domain) - indicates this is a gPTP announce message",
+                    sync: "0x1 (gPTP Domain) - indicates this is a gPTP sync message", 
+                    followup: "0x1 (gPTP Domain) - indicates this is a gPTP follow up message",
+                    pdelay_req: "0x2 (CMLDS) - Common Mean Link Delay Service for peer delay measurement",
+                    pdelay_resp: "0x2 (CMLDS) - Common Mean Link Delay Service for peer delay measurement",
+                    pdelay_fu: "0x2 (CMLDS) - Common Mean Link Delay Service for peer delay measurement"
+                }
+            },
+            "messageType": {
+                description: "Identifies the type of PTP message. Each message type serves a specific purpose in the PTP synchronization process.",
+                technical: "Values: 0x0=Sync, 0x1=Delay_Req, 0x2=Pdelay_Req, 0x3=Pdelay_Resp, 0x8=Follow_Up, 0x9=Delay_Resp, 0xA=Pdelay_Resp_Follow_Up, 0xB=Announce, 0xC=Signaling, 0xD=Management",
+                comments: {
+                    announce: "0xB (11) - Announce Message used for best master clock algorithm and network topology discovery",
+                    sync: "0x0 (0) - Sync Message carries time synchronization information from master to slaves",
+                    followup: "0x8 (8) - Follow_Up Message provides precise timestamp for two-step sync process",
+                    pdelay_req: "0x2 (2) - Peer_Delay_Req Message initiates peer-to-peer delay measurement",
+                    pdelay_resp: "0x3 (3) - Peer_Delay_Resp Message responds to peer delay request",
+                    pdelay_fu: "0xA (10) - Peer_Delay_Resp_Follow_Up provides precise timestamps for peer delay calculation"
+                }
+            },
+            "flags": {
+                description: "Control flags that provide additional information about the message and how it should be processed. Each bit has a specific meaning for message handling and clock properties.",
+                technical: "16-bit field with various bit flags: LI61, LI59, UTC_VALID, PTP_TIMESCALE, TIME_TRACEABLE, FREQUENCY_TRACEABLE, SYNCHRONIZATION_UNCERTAIN, etc.",
+                flagDetails: {
+                    "bit0": "LI61 - Leap second 61 will be inserted",
+                    "bit1": "LI59 - Leap second 59 will be deleted", 
+                    "bit2": "UTC_VALID - UTC offset is valid",
+                    "bit3": "PTP_TIMESCALE - PTP timescale (vs ARB timescale)",
+                    "bit4": "TIME_TRACEABLE - Time is traceable to primary source",
+                    "bit5": "FREQUENCY_TRACEABLE - Frequency is traceable to primary source",
+                    "bit6": "SYNCHRONIZATION_UNCERTAIN - Synchronization is uncertain",
+                    "bit8": "ALTERNATE_MASTER - Alternate master flag (gPTP)",
+                    "bit9": "TWO_STEP - Two-step clock (requires Follow_Up)",
+                    "bit10": "UNICAST - Unicast transmission"
+                },
+                comments: {
+                    announce: "0x0008 - Only TIME_TRACEABLE bit is set, indicating time is traceable to primary reference",
+                    sync: "0x0200 - TWO_STEP flag is set, indicating Follow_Up message will provide precise timestamp",
+                    followup: "0x0000 - No special flags set for this Follow_Up message",
+                    pdelay_req: "0x0000 - No special flags needed for peer delay request",
+                    pdelay_resp: "0x0200 - TWO_STEP flag set, indicating Follow_Up message will provide precise timestamp", 
+                    pdelay_fu: "0x0000 - No special flags set for this Follow_Up message"
+                }
+            }
+        };
+
+        let currentMessageType = null;
+        let currentField = null;
+
+        function showMessageType(type) {
+            currentMessageType = type;
+            
+            // Update active button
+            document.querySelectorAll('.message-type').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-type="${type}"]`).classList.add('active');
+            
+            // Generate tree view
+            generateTreeView(type);
+        }
+
+        function generateTreeView(messageType) {
+            const data = ptpData[messageType];
+            const treeView = document.getElementById('treeView');
+            
+            let html = `<div class="tree-item header-item">${data.title}</div>`;
+            
+            function renderFields(fields, indent = 1) {
+                let result = '';
+                for (const [key, value] of Object.entries(fields)) {
+                    if (typeof value === 'object') {
+                        result += `<div class="tree-item tlv-item indent-${indent}" data-field="${key}">${key}</div>`;
+                        result += renderFields(value, indent + 1);
+                    } else {
+                        result += `<div class="tree-item clickable indent-${indent}" data-field="${key}">${key}</div>`;
+                    }
+                }
+                return result;
+            }
+            
+            html += renderFields(data.fields);
+            treeView.innerHTML = html;
+            
+            // Add click listeners
+            document.querySelectorAll('.tree-item[data-field]').forEach(item => {
+                item.addEventListener('click', () => {
+                    showFieldInfo(item.dataset.field);
+                });
+            });
+        }
+
+        async function showFieldInfo(fieldName) {
+            currentField = fieldName;
+            const description = fieldDescriptions[fieldName];
+            const welcomeInfo = document.getElementById('welcomeInfo');
+            const fieldInfo = document.getElementById('fieldInfo');
+            
+            welcomeInfo.classList.remove('active');
+            fieldInfo.classList.add('active');
+            
+            if (description) {
+                let commentSection = '';
+                if (description.comments && description.comments[currentMessageType]) {
+                    commentSection = `
+                        <div class="field-description">
+                            <h4>Value in ${currentMessageType.replace('_', ' ').toUpperCase()} Message</h4>
+                            <p><strong>${description.comments[currentMessageType]}</strong></p>
+                        </div>
+                    `;
+                }
+                
+                let flagsSection = '';
+                if (fieldName === 'flags' && description.flagDetails) {
+                    flagsSection = `
+                        <div class="field-description">
+                            <h4>Flag Bits Explanation</h4>
+                            <div class="flags-grid">
+                                ${Object.entries(description.flagDetails).map(([bit, desc]) => 
+                                    `<div class="flag-item"><strong>${bit}:</strong> ${desc}</div>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                fieldInfo.innerHTML = `
+                    <div class="field-info">
+                        <h3><span class="icon">📋</span>${fieldName}</h3>
+                    </div>
+                    ${commentSection}
+                    <div class="field-description">
+                        <h4>Description</h4>
+                        <p>${description.description}</p>
+                        ${description.technical ? `<div class="technical"><strong>Technical Details:</strong>
